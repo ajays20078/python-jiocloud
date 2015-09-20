@@ -53,11 +53,27 @@ class DeploymentOrchestrator(object):
     # add k/v for nodes,roles, or globally for either configuration state
     # or upgarde versions. This is intended to allow for different override levels
     # to control whether or not puppet runs or versions updates
+
+   ## Have separate functions for getting action types and scopes so that adding or deleting new actions/scopes doesnot change any other function other than this.
+    def get_action_types(self):
+                action_types=[]
+                action_types.append("state")
+                action_types.append("version")
+                return action_types
+
+    def get_scopes(self):
+                scopes=[]
+                scopes.append("global")
+                scopes.append("role")
+                scopes.append("host")
+                return scopes
+
+
     def manage_config(self, action_type, scope, data, name=None, action="set"):
-        if not any(action_type in s for s in ['state', 'version']):
+        if action_type not in self.get_action_types():
             print "Invalid action type: %s" % action_type
             return False
-        if not any(scope in s for s in ['global', 'role', 'host']):
+        if scope not in self.get_scopes():
             print "Invalid scope type: %s" % scope
             return False
         try:
@@ -221,14 +237,21 @@ class DeploymentOrchestrator(object):
         # that when they fail during bootstrapping, it does not cause services
         # to be deregistered by consul. This code ensures that those "warnings"
         # are treated as failures in this context
-        puppet_failures = [w for w in warnings if w['Name'] == 'puppet']
-        validation_failures = [w for w in warnings if w['Name'] == 'validation']
+	other_warnings=[]
+	puppet_failures=[]
+	validation_failures=[]
+	for w in warnings:
+		if w['Name'] == "puppet":
+			puppet_failures.append(w)
+		elif w['Name'] == "validation":
+			validation_failures.append(w)
+		else:
+			other_warnings.append(w)
         failures = failures + puppet_failures + validation_failures
         if hosts:
             if len(failures) != 0: print "Failures:"
             for x in failures:
                 print "  Node: %s, Check: %s" % (x['Node'], x['Name'])
-        other_warnings = [w for w in warnings if w['Name'] != 'validation' and w['Name'] != 'puppet']
         if show_warnings:
             if hosts:
                 if len(other_warnings) != 0: print "Warnings:"
